@@ -20,14 +20,15 @@ if not os.path.exists("image"):
     os.mkdir("image")
 
 # Initialize the Dash app
-app = Dash(__name__)
+external_stylesheets = ["https://codepen.io/chriddyp/pen/bWLwgP.css"]
+app = Dash(__name__, external_stylesheets=external_stylesheets)
 
 
 @lru_cache(maxsize=32)
 def read_data(contents: str, filename: str) -> Optional[pd.DataFrame]:
     """Read and process uploaded data file with caching."""
     try:
-        content_type, content_string = contents.split(",")
+        _, content_string = contents.split(",")
         decoded = base64.b64decode(content_string)
 
         df = pd.read_csv(
@@ -153,12 +154,29 @@ app.layout = html.Div(
                 style={"padding": "30px 0"},
             ),
         ),
-        dcc.Checklist(
-            id="file-selection",
-            options=[],  # This will be populated dynamically
-            value=[],  # Initially no files are selected
-            inline=True,
-            labelStyle={"display": "block"},  # Display each option on a new line
+        html.Div(
+            style={
+                "display": "flex",
+                "flexDirection": "row",
+                "alignItems": "center",
+            },  # Flexbox for two columns
+            children=[
+                dcc.Checklist(
+                    id="file-selection",
+                    options=[],  # This will be populated dynamically
+                    value=[],  # Initially no files are selected
+                    inline=True,
+                    labelStyle={
+                        "display": "block"
+                    },  # Display each option on a new line
+                ),
+                html.Button(
+                    "Clear all data",
+                    id="clear-all-data",
+                    n_clicks=0,
+                    style={"marginLeft": "100px"},
+                ),  # Added margin for spacing
+            ],
         ),
         dcc.Tabs(
             [
@@ -236,10 +254,13 @@ app.layout = html.Div(
     State("upload-data", "filename"),
     State("stored-data", "data"),
     State("file-selection", "value"),  # Add this to preserve existing selections
+    Input("clear-all-data", "n_clicks"),
 )
-def update_data(contents, filenames, existing_data, existing_selection):
+def update_data(contents, filenames, existing_data, existing_selection, n_clicks):
     if contents is None:
         raise PreventUpdate
+    if n_clicks > 0:
+        return [], [], []
 
     # Initialize data_list with existing data
     data_list = existing_data if existing_data else []
@@ -266,11 +287,9 @@ def update_data(contents, filenames, existing_data, existing_selection):
     Output("simple-plot", "figure"),
     Input("stored-data", "data"),
     Input("plot-options", "value"),
-    Input("file-selection", "value"),  # Get selected files
+    State("file-selection", "value"),  # Get selected files
 )
 def update_simple_plot(data_list, options, selected_files):
-    if not data_list:
-        raise PreventUpdate
 
     # Convert stored dict data back to DataFrame format
     processed_data = []
@@ -287,11 +306,9 @@ def update_simple_plot(data_list, options, selected_files):
 @app.callback(
     Output("smooth-plot", "figure"),
     Input("stored-data", "data"),
-    Input("file-selection", "value"),  # Get selected files
+    State("file-selection", "value"),  # Get selected files
 )
 def update_smooth_plot(data_list, selected_files):
-    if not data_list:
-        raise PreventUpdate
 
     # Convert stored dict data back to DataFrame format
     processed_data = []
@@ -326,6 +343,7 @@ def save_smooth_plot(n_clicks, figure):
 def save_simple_plot(n_clicks, figure):
     if n_clicks > 0:
         # Save the figure as an SVG file
+        # print(figure)
         return dcc.send_file(
             "image/simple_plot.svg",
         )
