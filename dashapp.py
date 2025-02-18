@@ -99,7 +99,9 @@ def simple_chart(
     if not data_list:
         return go.Figure()
 
-    chart = go.Figure().update_layout(legend=dict(x=0, y=0.5))
+    chart = go.Figure().update_layout(
+        legend=dict(x=0, y=0.5), margin=dict(l=50, r=50, t=50, b=50)
+    )
 
     if ev_plot:
         data_x = "energy"
@@ -145,6 +147,11 @@ app.layout = html.Div(
                 "margin": "10px",
             },
             multiple=True,
+            loading_state=dict(
+                component_name="smooth-plot",
+                is_loading=True,
+                style={"padding": "30px 0"},
+            ),
         ),
         dcc.Checklist(
             id="file-selection",
@@ -160,6 +167,15 @@ app.layout = html.Div(
                     children=[
                         html.Div(
                             [
+                                dcc.Graph(
+                                    id="simple-plot",
+                                    config={
+                                        "toImageButtonOptions": {
+                                            "filename": "simple_plot",
+                                            "format": "svg",
+                                        }
+                                    },
+                                ),
                                 dcc.Checklist(
                                     id="plot-options",
                                     options=[
@@ -170,7 +186,6 @@ app.layout = html.Div(
                                     value=[],
                                     inline=True,
                                 ),
-                                dcc.Graph(id="simple-plot"),
                                 html.Button(
                                     "Save Simple Plot",
                                     id="save-simple-plot",
@@ -186,7 +201,15 @@ app.layout = html.Div(
                     children=[
                         html.Div(
                             [
-                                dcc.Graph(id="smooth-plot"),
+                                dcc.Graph(
+                                    id="smooth-plot",
+                                    config={
+                                        "toImageButtonOptions": {
+                                            "filename": "smooth_plot",
+                                            "format": "svg",
+                                        }
+                                    },
+                                ),
                                 html.Button(
                                     "Save Smooth Plot",
                                     id="save-smooth-plot",
@@ -220,14 +243,16 @@ def update_data(contents, filenames, existing_data, existing_selection):
 
     # Initialize data_list with existing data
     data_list = existing_data if existing_data else []
-    file_options = []  # To store file options for the checklist
+    file_options = [
+        stored_data["name"] for stored_data in existing_data
+    ]  # To store file options for the checklist
     selected_files = list(existing_selection)  # Convert to list to modify
 
     for content, filename in zip(contents, filenames):
         df = read_data(content, filename)
         if df is not None:
             data_list.append({"name": filename, "data": df.to_dict("list")})
-            file_options.append({"label": filename, "value": filename})
+            file_options.append(filename)
             selected_files.append(filename)  # Add new file to selected files
 
     return (
@@ -259,16 +284,21 @@ def update_simple_plot(data_list, options, selected_files):
     )
 
 
-@app.callback(Output("smooth-plot", "figure"), Input("stored-data", "data"))
-def update_smooth_plot(data_list):
+@app.callback(
+    Output("smooth-plot", "figure"),
+    Input("stored-data", "data"),
+    Input("file-selection", "value"),  # Get selected files
+)
+def update_smooth_plot(data_list, selected_files):
     if not data_list:
         raise PreventUpdate
 
     # Convert stored dict data back to DataFrame format
     processed_data = []
     for item in data_list:
-        item["data"] = pd.DataFrame(item["data"])
-        processed_data.append(item)
+        if item["name"] in selected_files:  # Only process selected files
+            item["data"] = pd.DataFrame(item["data"])
+            processed_data.append(item)
 
     return smooth_chart(processed_data)
 
