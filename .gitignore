@@ -1,1 +1,4 @@
 PLdraw-streamlit
+.python-version
+__pycache__
+image/*
