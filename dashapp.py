@@ -1,4 +1,4 @@
-from dash import dcc, html, Input, Output, State, Dash
+from dash import dcc, html, Input, Output, State, Dash, ctx
 from dash.exceptions import PreventUpdate
 import pandas as pd
 import plotly.graph_objects as go
@@ -275,7 +275,7 @@ app.layout = html.Div(
 def update_data(contents, filenames, existing_data, existing_selection, n_clicks):
     if contents is None:
         raise PreventUpdate
-    if n_clicks > 0:
+    if ctx.triggered_id == "clear-all-data":
         return [], [], []
 
     data_list = existing_data if existing_data else []
@@ -322,7 +322,7 @@ def update_smooth_plot(data_list, selected_files):
     prevent_initial_call=True,
 )
 def save_smooth_plot(n_clicks, figure):
-    if n_clicks > 0:
+    if ctx.triggered_id == "save-smooth-plot":
         return dcc.send_file("image/smooth_plot43.svg")
 
 
@@ -333,9 +333,9 @@ def save_smooth_plot(n_clicks, figure):
     prevent_initial_call=True,
 )
 def save_simple_plot(n_clicks, figure):
-    if n_clicks > 0:
+    if ctx.triggered_id == "save-simple-plot":
         return dcc.send_file("image/simple_plot43.svg")
 
 
 if __name__ == "__main__":
-    app.run_server(debug=True)
+    app.run_server(debug=True, host="0.0.0.0")  # fix host to 0.0.0.0 for docker
