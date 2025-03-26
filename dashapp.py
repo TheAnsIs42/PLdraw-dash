@@ -178,38 +178,48 @@ def create_matrix_plot(
     title: str,
 ) -> go.Figure:
     """Create matrix PL plot using plotly."""
-    fig = make_subplots(rows=1, cols=3, shared_yaxes=True)
-    fig.add_trace(go.Heatmap(z=data, x=column, y=data.index, colorscale="turbo"))
+    fig = make_subplots(
+        rows=1, cols=3, shared_yaxes=True, column_widths=(0.6, 0.2, 0.2)
+    )
+    fig.add_trace(
+        go.Heatmap(z=data, x=column, y=data.index, colorscale="turbo"), row=1, col=1
+    )
     fig.add_trace(
         go.Scatter(y=index, x=max_intensity),
         row=1,
         col=2,
     )
     fig.add_trace(go.Scatter(y=index, x=pos), row=1, col=3)
-    # # Add heatmap
-    # fig.add_trace(
-    #     go.Heatmap(
-    #         z=data,
-    #         x=np.linspace(extent[0], extent[1], data.shape[1]),
-    #         y=index,
-    #         colorscale="turbo",
-    #         colorbar=dict(title="PL intensity (arb. u.)", tickformat=".0e4"),
-    #         name="PL Spectrum",
-    #     )
-    # )
 
-    # # Update layout
-    # fig.update_layout(
-    #     title=title,
-    #     xaxis_title="Wavelength (nm)",
-    #     yaxis_title="Position (μm)",
-    #     height=DEFAULT_HEIGHT,
-    #     width=DEFAULT_WIDTH * 2,
-    # )
+    # Calculate ranges with margins
+    max_intensity_range = (
+        max_intensity.min() - (max_intensity.max() - max_intensity.min()) * 0.05,
+        max_intensity.max() + (max_intensity.max() - max_intensity.min()) * 0.05,
+    )
+    pos_range = (
+        pos.min() - (pos.max() - pos.min()) * 0.05,
+        pos.max() + (pos.max() - pos.min()) * 0.05,
+    )
+
+    # Update layout for each subplot
+    fig.update_xaxes(title_text="Wavelength (nm)", row=1, col=1)
+    fig.update_xaxes(
+        title_text="Intensity (arb. u.)", range=max_intensity_range, row=1, col=2
+    )
+    fig.update_xaxes(title_text="Peak Position (nm)", range=pos_range, row=1, col=3)
+    fig.update_yaxes(title_text="Position (μm)")
+
+    # Update overall layout
+    fig.update_layout(
+        # title=title,
+        # height=DEFAULT_HEIGHT * 2,  # Double the height for better aspect ratio
+        showlegend=False,
+        margin=dict(l=50, r=50, t=50, b=50),
+    )
 
     # Save the plot
     fig.write_image(
-        "image/matrix_plot.svg", width=DEFAULT_WIDTH * 2, height=DEFAULT_HEIGHT
+        "image/matrix_plot.svg",  # width=DEFAULT_WIDTH, height=DEFAULT_HEIGHT * 2
     )
 
     return fig
