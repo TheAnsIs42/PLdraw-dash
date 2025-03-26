@@ -179,10 +179,14 @@ def create_matrix_plot(
 ) -> go.Figure:
     """Create matrix PL plot using plotly."""
     fig = make_subplots(
-        rows=1, cols=3, shared_yaxes=True, column_widths=(0.6, 0.2, 0.2)
+        rows=1,
+        cols=3,
+        shared_yaxes=True,
+        column_widths=(0.6, 0.2, 0.2),
+        subplot_titles=("", "peak intensity", "peak position"),
     )
     fig.add_trace(
-        go.Heatmap(z=data, x=column, y=data.index, colorscale="turbo"), row=1, col=1
+        go.Heatmap(z=data, x=column, y=index, colorscale="turbo"), row=1, col=1
     )
     fig.add_trace(
         go.Scatter(y=index, x=max_intensity),
