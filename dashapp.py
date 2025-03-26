@@ -3,12 +3,14 @@ from dash.exceptions import PreventUpdate
 import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
+from plotly.subplots import make_subplots
 from scipy import signal
 import os
 import base64
 import io
 from functools import lru_cache
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Tuple
+import numpy as np
 
 # Constants
 PLANCK_CONST = 6.63e-34 / 1.6e-19  # eV energy
@@ -150,94 +152,223 @@ def simple_chart(
     return chart
 
 
+def read_matrixPL(
+    filepath: str, savgol_window: int = 150, savgol_poly: int = 2
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Read and process matrix PL data file."""
+    data = pd.read_csv(filepath, sep=r"\s+")
+    filt_data = signal.savgol_filter(data, savgol_window, savgol_poly, axis=1)
+    peak_idx = filt_data.argmax(1)
+    peak_pos = data.columns.to_numpy(dtype=float)[peak_idx]
+    return (
+        data,
+        data.index,
+        peak_pos,
+        filt_data.max(axis=1),
+        data.columns.astype(float),
+    )
+
+
+def create_matrix_plot(
+    data: np.ndarray,
+    index: np.ndarray,
+    pos: np.ndarray,
+    max_intensity: np.ndarray,
+    column: np.ndarray,
+    title: str,
+) -> go.Figure:
+    """Create matrix PL plot using plotly."""
+    fig = make_subplots(rows=1, cols=3, shared_yaxes=True)
+    fig.add_trace(go.Heatmap(z=data, x=column, y=data.index, colorscale="turbo"))
+    fig.add_trace(
+        go.Scatter(y=index, x=max_intensity),
+        row=1,
+        col=2,
+    )
+    fig.add_trace(go.Scatter(y=index, x=pos), row=1, col=3)
+    # # Add heatmap
+    # fig.add_trace(
+    #     go.Heatmap(
+    #         z=data,
+    #         x=np.linspace(extent[0], extent[1], data.shape[1]),
+    #         y=index,
+    #         colorscale="turbo",
+    #         colorbar=dict(title="PL intensity (arb. u.)", tickformat=".0e4"),
+    #         name="PL Spectrum",
+    #     )
+    # )
+
+    # # Update layout
+    # fig.update_layout(
+    #     title=title,
+    #     xaxis_title="Wavelength (nm)",
+    #     yaxis_title="Position (μm)",
+    #     height=DEFAULT_HEIGHT,
+    #     width=DEFAULT_WIDTH * 2,
+    # )
+
+    # Save the plot
+    fig.write_image(
+        "image/matrix_plot.svg", width=DEFAULT_WIDTH * 2, height=DEFAULT_HEIGHT
+    )
+
+    return fig
+
+
 # Layout
 app.layout = html.Div(
     [
-        dcc.Upload(
-            id="upload-data",
-            children=html.Div(["Drag and Drop or ", html.A("Select Files")]),
-            style={
-                "width": "100%",
-                "height": "60px",
-                "lineHeight": "60px",
-                "borderWidth": "1px",
-                "borderStyle": "dashed",
-                "borderRadius": "5px",
-                "textAlign": "center",
-                "margin": "10px",
-            },
-            multiple=True,
-            loading_state=dict(
-                component_name="smooth-plot",
-                is_loading=True,
-                style={"padding": "30px 0"},
-            ),
-        ),
-        html.Div(
-            style={
-                "display": "flex",
-                "flexDirection": "row",
-                "alignItems": "center",
-            },
-            children=[
-                dcc.Checklist(
-                    id="file-selection",
-                    options=[],  # This will be populated dynamically
-                    value=[],  # Initially no files are selected
-                    inline=True,
-                    labelStyle={"display": "block"},
-                ),
-                html.Button(
-                    "Clear all data",
-                    id="clear-all-data",
-                    n_clicks=0,
-                    style={"marginLeft": "100px"},
-                ),
-            ],
-        ),
         dcc.Tabs(
             [
                 dcc.Tab(
-                    label="Simple Plot",
+                    label="Simple PL Analysis",
                     children=[
+                        dcc.Upload(
+                            id="upload-list-pl",
+                            children=html.Div(
+                                ["Drag and Drop or ", html.A("Select Files")]
+                            ),
+                            style={
+                                "width": "100%",
+                                "height": "60px",
+                                "lineHeight": "60px",
+                                "borderWidth": "1px",
+                                "borderStyle": "dashed",
+                                "borderRadius": "5px",
+                                "textAlign": "center",
+                                "margin": "10px",
+                            },
+                            multiple=True,
+                            loading_state=dict(
+                                component_name="smooth-plot",
+                                is_loading=True,
+                                style={"padding": "30px 0"},
+                            ),
+                        ),
                         html.Div(
-                            [
-                                dcc.Graph(
-                                    id="simple-plot",
-                                    config={
-                                        "toImageButtonOptions": {
-                                            "filename": "simple_plot",
-                                            "format": "svg",
-                                        }
-                                    },
-                                ),
+                            style={
+                                "display": "flex",
+                                "flexDirection": "row",
+                                "alignItems": "center",
+                            },
+                            children=[
                                 dcc.Checklist(
-                                    id="plot-options",
-                                    options=[
-                                        {"label": "Energy plot", "value": "ev_plot"},
-                                        {"label": "Normalizing", "value": "normalize"},
-                                        {"label": "Log Y axis", "value": "log_y"},
-                                    ],
-                                    value=[],
+                                    id="file-selection",
+                                    options=[],  # This will be populated dynamically
+                                    value=[],  # Initially no files are selected
                                     inline=True,
+                                    labelStyle={"display": "block"},
                                 ),
                                 html.Button(
-                                    "Save Simple Plot",
-                                    id="save-simple-plot",
+                                    "Clear all data",
+                                    id="clear-all-data",
                                     n_clicks=0,
+                                    style={"marginLeft": "100px"},
                                 ),
-                                dcc.Download(id="download-simple-plot"),
+                            ],
+                        ),
+                        dcc.Tabs(
+                            [
+                                dcc.Tab(
+                                    label="Simple Plot",
+                                    children=[
+                                        html.Div(
+                                            [
+                                                dcc.Graph(
+                                                    id="simple-plot",
+                                                    config={
+                                                        "toImageButtonOptions": {
+                                                            "filename": "simple_plot",
+                                                            "format": "svg",
+                                                        }
+                                                    },
+                                                ),
+                                                dcc.Checklist(
+                                                    id="plot-options",
+                                                    options=[
+                                                        {
+                                                            "label": "Energy plot",
+                                                            "value": "ev_plot",
+                                                        },
+                                                        {
+                                                            "label": "Normalizing",
+                                                            "value": "normalize",
+                                                        },
+                                                        {
+                                                            "label": "Log Y axis",
+                                                            "value": "log_y",
+                                                        },
+                                                    ],
+                                                    value=[],
+                                                    inline=True,
+                                                ),
+                                                html.Button(
+                                                    "Save Simple Plot",
+                                                    id="save-simple-plot",
+                                                    n_clicks=0,
+                                                ),
+                                                dcc.Download(id="download-simple-plot"),
+                                            ]
+                                        )
+                                    ],
+                                ),
+                                dcc.Tab(
+                                    label="Smooth & Peak",
+                                    children=[
+                                        html.Div(
+                                            [
+                                                dcc.Graph(
+                                                    id="smooth-plot",
+                                                    config={
+                                                        "toImageButtonOptions": {
+                                                            "filename": "smooth_plot",
+                                                            "format": "svg",
+                                                        }
+                                                    },
+                                                ),
+                                                html.Button(
+                                                    "Save Smooth Plot",
+                                                    id="save-smooth-plot",
+                                                    n_clicks=0,
+                                                ),
+                                                dcc.Download(id="download-smooth-plot"),
+                                            ]
+                                        )
+                                    ],
+                                ),
                             ]
-                        )
+                        ),
                     ],
                 ),
                 dcc.Tab(
-                    label="Smooth & Peak",
+                    label="Matrix PL Analysis",
                     children=[
                         html.Div(
                             [
+                                dcc.Upload(
+                                    id="upload-matrix-pl",
+                                    children=html.Div(
+                                        ["Upload Data for Matrix PL Analysis"]
+                                    ),
+                                    style={
+                                        "width": "100%",
+                                        "height": "60px",
+                                        "lineHeight": "60px",
+                                        "borderWidth": "1px",
+                                        "borderStyle": "dashed",
+                                        "borderRadius": "5px",
+                                        "textAlign": "center",
+                                        "margin": "10px",
+                                    },
+                                    multiple=True,
+                                    loading_state=dict(
+                                        component_name="smooth-plot",
+                                        is_loading=True,
+                                        style={"padding": "30px 0"},
+                                    ),
+                                ),
                                 dcc.Graph(
-                                    id="smooth-plot",
+                                    id="matrix-plot",
                                     config={
                                         "toImageButtonOptions": {
                                             "filename": "smooth_plot",
@@ -245,12 +376,6 @@ app.layout = html.Div(
                                         }
                                     },
                                 ),
-                                html.Button(
-                                    "Save Smooth Plot",
-                                    id="save-smooth-plot",
-                                    n_clicks=0,
-                                ),
-                                dcc.Download(id="download-smooth-plot"),
                             ]
                         )
                     ],
@@ -266,8 +391,8 @@ app.layout = html.Div(
     Output("stored-data", "data"),
     Output("file-selection", "options"),
     Output("file-selection", "value"),
-    Input("upload-data", "contents"),
-    State("upload-data", "filename"),
+    Input("upload-list-pl", "contents"),
+    State("upload-list-pl", "filename"),
     State("stored-data", "data"),
     State("file-selection", "value"),
     Input("clear-all-data", "n_clicks"),
@@ -335,6 +460,51 @@ def save_smooth_plot(n_clicks, figure):
 def save_simple_plot(n_clicks, figure):
     if ctx.triggered_id == "save-simple-plot":
         return dcc.send_file("image/simple_plot43.svg")
+
+
+@app.callback(
+    Output("matrix-plot", "figure"),
+    Input("upload-matrix-pl", "contents"),
+    State("upload-matrix-pl", "filename"),
+    prevent_initial_call=True,
+)
+def update_matrix_plot(contents, filename):
+    if contents is None:
+        raise PreventUpdate
+
+    # Process the uploaded file
+    content = contents[0]  # Take the first file
+    _, content_string = content.split(",")
+    decoded = base64.b64decode(content_string)
+
+    # Save the temporary file
+    temp_file = "temp_matrix.txt"
+    with open(temp_file, "wb") as f:
+        f.write(decoded)
+
+    try:
+        # Read and process the matrix PL data
+        data, index, pos, max_intensity, column = read_matrixPL(temp_file)
+
+        # Create the plot
+        fig = create_matrix_plot(
+            data,
+            index,
+            pos,
+            max_intensity,
+            column,
+            f"Matrix PL Analysis: {filename[0]}",
+        )
+
+        # Clean up temporary file
+        os.remove(temp_file)
+
+        return fig
+    except Exception as e:
+        print(f"Error processing matrix PL file: {str(e)}")
+        if os.path.exists(temp_file):
+            os.remove(temp_file)
+        return go.Figure()
 
 
 if __name__ == "__main__":
