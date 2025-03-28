@@ -189,11 +189,11 @@ def create_matrix_plot(
         go.Heatmap(z=data, x=column, y=index, colorscale="turbo"), row=1, col=1
     )
     fig.add_trace(
-        go.Scatter(y=index, x=max_intensity),
+        go.Scatter(y=index, x=max_intensity, mode="lines+markers"),
         row=1,
         col=2,
     )
-    fig.add_trace(go.Scatter(y=index, x=pos), row=1, col=3)
+    fig.add_trace(go.Scatter(y=index, x=pos, mode="lines+markers"), row=1, col=3)
 
     # Calculate ranges with margins
     max_intensity_range = (
