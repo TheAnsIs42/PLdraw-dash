@@ -372,12 +372,16 @@ app.layout = html.Div(
                                         "textAlign": "center",
                                         "margin": "10px",
                                     },
-                                    multiple=True,
+                                    multiple=False,
                                     loading_state=dict(
                                         component_name="smooth-plot",
                                         is_loading=True,
                                         style={"padding": "30px 0"},
                                     ),
+                                ),
+                                html.H3(
+                                    id="matrix-plot-title",
+                                    style={"textAlign": "center", "margin": "10px"},
                                 ),
                                 dcc.Graph(
                                     id="matrix-plot",
@@ -481,7 +485,7 @@ def save_simple_plot(n_clicks, figure):
 
 
 @app.callback(
-    Output("matrix-plot", "figure"),
+    [Output("matrix-plot", "figure"), Output("matrix-plot-title", "children")],
     Input("upload-matrix-pl", "contents"),
     State("upload-matrix-pl", "filename"),
     prevent_initial_call=True,
@@ -491,8 +495,7 @@ def update_matrix_plot(contents, filename):
         raise PreventUpdate
 
     # Process the uploaded file
-    content = contents[0]  # Take the first file
-    _, content_string = content.split(",")
+    _, content_string = contents.split(",")
     decoded = base64.b64decode(content_string)
 
     # Save the temporary file
@@ -511,18 +514,18 @@ def update_matrix_plot(contents, filename):
             pos,
             max_intensity,
             column,
-            f"Matrix PL Analysis: {filename[0]}",
+            f"Matrix PL Analysis: {filename}",
         )
 
         # Clean up temporary file
         os.remove(temp_file)
 
-        return fig
+        return fig, f"Matrix PL Analysis: {filename}"
     except Exception as e:
         print(f"Error processing matrix PL file: {str(e)}")
         if os.path.exists(temp_file):
             os.remove(temp_file)
-        return go.Figure()
+        return go.Figure(), "Error processing file"
 
 
 @app.callback(
