@@ -2,6 +2,7 @@ version: '3.8'
 
 services:
   pldraw-dash:
+    container_name: pldraw-dash
     image: pldraw-dash:latest
     build: 
       context: .
