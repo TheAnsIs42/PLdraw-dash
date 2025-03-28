@@ -210,8 +210,8 @@ def create_matrix_plot(
     fig.update_xaxes(
         title_text="Intensity (arb. u.)", range=max_intensity_range, row=1, col=2
     )
-    fig.update_xaxes(title_text="Peak Position (nm)", range=pos_range, row=1, col=3)
-    fig.update_yaxes(title_text="Position (μm)")
+    fig.update_xaxes(title_text="Wavelength (nm)", range=pos_range, row=1, col=3)
+    fig.update_yaxes(title_text="X Position (μm)")
 
     # Update overall layout
     fig.update_layout(
@@ -222,9 +222,7 @@ def create_matrix_plot(
     )
 
     # Save the plot
-    fig.write_image(
-        "image/matrix_plot.svg",  # width=DEFAULT_WIDTH, height=DEFAULT_HEIGHT * 2
-    )
+    fig.write_image("image/matrix_plot.svg", width=640, height=360)
 
     return fig
 
@@ -390,6 +388,12 @@ app.layout = html.Div(
                                         }
                                     },
                                 ),
+                                html.Button(
+                                    "Save Matrix Plot",
+                                    id="save-matrix-plot",
+                                    n_clicks=0,
+                                ),
+                                dcc.Download(id="download-matrix-plot"),
                             ]
                         )
                     ],
@@ -519,6 +523,16 @@ def update_matrix_plot(contents, filename):
         if os.path.exists(temp_file):
             os.remove(temp_file)
         return go.Figure()
+
+
+@app.callback(
+    Output("download-matrix-plot", "data"),
+    Input("save-matrix-plot", "n_clicks"),
+    prevent_initial_call=True,
+)
+def save_matrix_plot(n_clicks):
+    if ctx.triggered_id == "save-matrix-plot":
+        return dcc.send_file("image/matrix_plot.svg")
 
 
 if __name__ == "__main__":
