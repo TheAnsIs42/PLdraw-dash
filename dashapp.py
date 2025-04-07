@@ -154,7 +154,7 @@ def simple_chart(
 
 def read_matrixPL(
     filepath: str, savgol_window: int = 150, savgol_poly: int = 2
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+) -> Tuple[pd.DataFrame, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """Read and process matrix PL data file."""
     data = pd.read_csv(filepath, sep=r"\s+")
     filt_data = signal.savgol_filter(data, savgol_window, savgol_poly, axis=1)
@@ -170,7 +170,7 @@ def read_matrixPL(
 
 
 def create_matrix_plot(
-    data: np.ndarray,
+    data: pd.DataFrame,
     index: np.ndarray,
     pos: np.ndarray,
     max_intensity: np.ndarray,
@@ -225,6 +225,49 @@ def create_matrix_plot(
     fig.write_image("image/matrix_plot.svg", width=640, height=360)
 
     return fig
+
+
+def create_matrix_extract_plot(
+    data: pd.DataFrame,
+) -> go.Figure:
+    data = data.T
+    data.index = data.index.astype(float)
+    fig = px.line(data)
+    return fig
+
+
+def process_matrix_upload(contents: str, filename: str) -> Tuple[
+    Optional[pd.DataFrame],
+    Optional[np.ndarray],
+    Optional[np.ndarray],
+    Optional[np.ndarray],
+    Optional[np.ndarray],
+    Optional[str],
+]:
+    """Process uploaded matrix PL data file.
+
+    Returns:
+        Tuple containing (data, index, pos, max_intensity, column, error_message)
+        If processing fails, all data values will be None and error_message will contain the error
+    """
+    if contents is None:
+        return None, None, None, None, None, "No file uploaded"
+
+    try:
+        # Process the uploaded file
+        _, content_string = contents.split(",")
+        decoded = base64.b64decode(content_string)
+
+        # Read and process the matrix PL data
+        data, index, pos, max_intensity, column = read_matrixPL(
+            io.StringIO(decoded.decode("utf-8"))
+        )
+
+        return data, index, pos, max_intensity, column, None
+    except Exception as e:
+        error_msg = f"Error processing matrix PL file: {str(e)}"
+        print(error_msg)
+        return None, None, None, None, None, error_msg
 
 
 # Layout
@@ -387,7 +430,7 @@ app.layout = html.Div(
                                     id="matrix-plot",
                                     config={
                                         "toImageButtonOptions": {
-                                            "filename": "smooth_plot",
+                                            "filename": "matrix_plot",
                                             "format": "svg",
                                         }
                                     },
@@ -398,6 +441,15 @@ app.layout = html.Div(
                                     n_clicks=0,
                                 ),
                                 dcc.Download(id="download-matrix-plot"),
+                                dcc.Graph(
+                                    id="matrix-extract-plot",
+                                    config={
+                                        "toImageButtonOptions": {
+                                            "filename": "matrix_extract_plot",
+                                            "format": "svg",
+                                        }
+                                    },
+                                ),
                             ]
                         )
                     ],
@@ -491,41 +543,42 @@ def save_simple_plot(n_clicks, figure):
     prevent_initial_call=True,
 )
 def update_matrix_plot(contents, filename):
-    if contents is None:
-        raise PreventUpdate
+    data, index, pos, max_intensity, column, error = process_matrix_upload(
+        contents, filename
+    )
 
-    # Process the uploaded file
-    _, content_string = contents.split(",")
-    decoded = base64.b64decode(content_string)
+    if error:
+        return go.Figure(), error
 
-    # Save the temporary file
-    temp_file = "temp_matrix.txt"
-    with open(temp_file, "wb") as f:
-        f.write(decoded)
+    fig = create_matrix_plot(
+        data,
+        index,
+        pos,
+        max_intensity,
+        column,
+        f"Matrix PL Analysis: {filename}",
+    )
 
-    try:
-        # Read and process the matrix PL data
-        data, index, pos, max_intensity, column = read_matrixPL(temp_file)
+    return fig, f"Matrix PL Analysis: {filename}"
 
-        # Create the plot
-        fig = create_matrix_plot(
-            data,
-            index,
-            pos,
-            max_intensity,
-            column,
-            f"Matrix PL Analysis: {filename}",
-        )
 
-        # Clean up temporary file
-        os.remove(temp_file)
+@app.callback(
+    Output("matrix-extract-plot", "figure"),
+    Input("upload-matrix-pl", "contents"),
+    State("upload-matrix-pl", "filename"),
+    prevent_initial_call=True,
+)
+def update_matrix_extract_plot(contents, filename):
+    data, _, _, _, _, error = process_matrix_upload(contents, filename)
 
-        return fig, f"Matrix PL Analysis: {filename}"
-    except Exception as e:
-        print(f"Error processing matrix PL file: {str(e)}")
-        if os.path.exists(temp_file):
-            os.remove(temp_file)
-        return go.Figure(), "Error processing file"
+    if error:
+        return go.Figure()
+
+    fig = create_matrix_extract_plot(
+        data,
+    )
+
+    return fig
 
 
 @app.callback(
