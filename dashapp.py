@@ -146,6 +146,7 @@ def simple_chart(
                 x=data["data"][data_x], y=data["data"][data_y], name=data["name"]
             )
         )
+    chart.update_layout(legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01))
     chart.write_image(
         "image/simple_plot43.svg", width=DEFAULT_WIDTH, height=DEFAULT_HEIGHT
     )
@@ -154,7 +155,7 @@ def simple_chart(
 
 def read_matrixPL(
     filepath: str, savgol_window: int = 150, savgol_poly: int = 2
-) -> Tuple[pd.DataFrame, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+) -> Tuple[pd.DataFrame, pd.Index, np.ndarray, np.ndarray, pd.Index]:
     """Read and process matrix PL data file."""
     data = pd.read_csv(filepath, sep=r"\s+")
     filt_data = signal.savgol_filter(data, savgol_window, savgol_poly, axis=1)
@@ -171,10 +172,10 @@ def read_matrixPL(
 
 def create_matrix_plot(
     data: pd.DataFrame,
-    index: np.ndarray,
+    index: pd.Index,
     pos: np.ndarray,
     max_intensity: np.ndarray,
-    column: np.ndarray,
+    column: pd.Index,
     title: str,
 ) -> go.Figure:
     """Create matrix PL plot using plotly."""
@@ -237,12 +238,12 @@ def create_matrix_extract_plot(
 
 
 def process_matrix_upload(contents: str, filename: str) -> Tuple[
-    Optional[pd.DataFrame],
-    Optional[np.ndarray],
-    Optional[np.ndarray],
-    Optional[np.ndarray],
-    Optional[np.ndarray],
-    Optional[str],
+    pd.DataFrame,
+    pd.Index,
+    np.ndarray,
+    np.ndarray,
+    pd.Index,
+    int,
 ]:
     """Process uploaded matrix PL data file.
 
@@ -251,7 +252,7 @@ def process_matrix_upload(contents: str, filename: str) -> Tuple[
         If processing fails, all data values will be None and error_message will contain the error
     """
     if contents is None:
-        return None, None, None, None, None, "No file uploaded"
+        return None, None, None, None, None, 0
 
     try:
         # Process the uploaded file
@@ -263,11 +264,18 @@ def process_matrix_upload(contents: str, filename: str) -> Tuple[
             io.StringIO(decoded.decode("utf-8"))
         )
 
-        return data, index, pos, max_intensity, column, None
+        return data, index, pos, max_intensity, column, 1
     except Exception as e:
         error_msg = f"Error processing matrix PL file: {str(e)}"
         print(error_msg)
-        return None, None, None, None, None, error_msg
+        return (
+            pd.DataFrame(),
+            pd.Index(),
+            np.ndarray(1),
+            np.ndarray(1),
+            pd.Index(),
+            0,
+        )  # return empty values under error to fit type check
 
 
 # Layout
@@ -543,12 +551,12 @@ def save_simple_plot(n_clicks, figure):
     prevent_initial_call=True,
 )
 def update_matrix_plot(contents, filename):
-    data, index, pos, max_intensity, column, error = process_matrix_upload(
+    data, index, pos, max_intensity, column, health = process_matrix_upload(
         contents, filename
     )
 
-    if error:
-        return go.Figure(), error
+    if health == 0:
+        return go.Figure()
 
     fig = create_matrix_plot(
         data,
@@ -569,9 +577,9 @@ def update_matrix_plot(contents, filename):
     prevent_initial_call=True,
 )
 def update_matrix_extract_plot(contents, filename):
-    data, _, _, _, _, error = process_matrix_upload(contents, filename)
+    (data, _, _, _, _, health) = process_matrix_upload(contents, filename)
 
-    if error:
+    if health == 0:
         return go.Figure()
 
     fig = create_matrix_extract_plot(
