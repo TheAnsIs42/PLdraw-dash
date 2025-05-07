@@ -3,3 +3,4 @@ PLdraw-streamlit
 __pycache__
 image/*
 pyrightconfig.json
+pyproject.toml
