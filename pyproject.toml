@@ -1,3 +1,0 @@
-[tool.pyright]
-venv="dash-env"
-venvPath="/Users/fusheng/.pyenv/versions/3.11.8/envs/"
