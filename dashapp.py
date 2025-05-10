@@ -249,7 +249,8 @@ def process_matrix_upload(contents: str, filename: str) -> Tuple[
 
     Returns:
         Tuple containing (data, index, pos, max_intensity, column, error_message)
-        If processing fails, all data values will be None and error_message will contain the error
+        If processing fails, all data values will be None and error_message
+        will contain the error
     """
     if contents is None:
         return None, None, None, None, None, 0
