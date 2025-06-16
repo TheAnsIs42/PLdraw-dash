@@ -12,6 +12,9 @@ from functools import lru_cache
 from typing import List, Dict, Optional, Tuple
 import numpy as np
 
+from itertools import cycle
+from matplotlib import colormaps
+
 # Constants
 PLANCK_CONST = 6.63e-34 / 1.6e-19  # eV energy
 SPEED_OF_LIGHT = 3e8
@@ -59,6 +62,7 @@ def process_selected_files(
     data_list: List[Dict], selected_files: List[str]
 ) -> List[Dict]:
     """Process and filter data based on selected files."""
+    print("p triggered")
     processed_data = []
     for item in data_list:
         if item["name"] in selected_files:
@@ -231,9 +235,31 @@ def create_matrix_plot(
 def create_matrix_extract_plot(
     data: pd.DataFrame,
 ) -> go.Figure:
+
     data = data.T
-    data.index = data.index.astype(float)
-    fig = px.line(data)
+    cmap = colormaps.get_cmap("turbo")
+    color = [cmap(x) for x in np.linspace(0, 1, data.shape[1])]  # * 255
+    cc = cycle(["rgba" + str(tuple(np.array(c).tolist())) for c in color])
+    # print(type(np.array(color[1]).tolist()[0]))
+    fig = go.Figure()
+    for column in data.columns.astype(float):
+
+        # print(type(column))
+        fig.add_trace(
+            go.Scatter(
+                x=data.index.astype(float),
+                y=data[column],
+                line_color=next(cc),
+                mode="lines",
+                name=str(column),
+            )
+        )
+    fig.update_traces(line={"width": 0.7})
+
+    # old
+    # data = data.T
+    # data.index = data.index.astype(float)
+    # fig = px.line(data)
     return fig
 
 
